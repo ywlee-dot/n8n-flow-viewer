@@ -6,9 +6,17 @@ type IconUrl = string | { light?: string; dark?: string };
 type NodeTypeDef = { name: string; iconUrl?: IconUrl };
 
 const require = createRequire(import.meta.url);
-const resolvedPkg = require.resolve("n8n-nodes-base/package.json");
+let resolvedPkg: string | null = null;
+try {
+  const maybeResolved = require.resolve("n8n-nodes-base/package.json");
+  resolvedPkg = typeof maybeResolved === "string" ? maybeResolved : null;
+} catch {
+  resolvedPkg = null;
+}
 const pkgDir =
-  resolvedPkg.includes("[project]") || resolvedPkg.startsWith("file://")
+  !resolvedPkg ||
+  resolvedPkg.includes("[project]") ||
+  resolvedPkg.startsWith("file://")
     ? path.join(process.cwd(), "node_modules", "n8n-nodes-base")
     : path.dirname(resolvedPkg);
 const nodesJsonPath = path.join(pkgDir, "dist/types/nodes.json");
