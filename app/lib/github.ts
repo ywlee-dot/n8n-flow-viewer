@@ -41,6 +41,14 @@ export async function ghListDir(dirPath: string): Promise<GithubContent[]> {
 
   const encodedPath = encodeGitHubPath(dirPath);
   const url = buildContentsUrl(owner, repo, encodedPath, branch);
+  console.log("[ghListDir] request", {
+    owner,
+    repo,
+    branch,
+    dirPath,
+    encodedPath,
+    url,
+  });
 
   const res = await fetch(url, {
     headers: ghHeaders(),
@@ -50,10 +58,16 @@ export async function ghListDir(dirPath: string): Promise<GithubContent[]> {
 
   if (!res.ok) {
     const text = await res.text();
+    console.error("[ghListDir] response error", {
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
     throw new Error(`GitHub listDir failed (${res.status}): ${text}`);
   }
   const data = (await res.json()) as GithubContent[] | GithubContent;
   if (!Array.isArray(data)) throw new Error("Expected directory listing array");
+  console.log("[ghListDir] response ok", { count: data.length });
   return data;
 }
 
@@ -64,6 +78,14 @@ export async function ghGetJsonFile(filePath: string): Promise<any> {
 
   const encodedPath = encodeGitHubPath(filePath);
   const url = buildContentsUrl(owner, repo, encodedPath, branch);
+  console.log("[ghGetJsonFile] request", {
+    owner,
+    repo,
+    branch,
+    filePath,
+    encodedPath,
+    url,
+  });
 
   const res = await fetch(url, {
     headers: ghHeaders(),
@@ -72,12 +94,21 @@ export async function ghGetJsonFile(filePath: string): Promise<any> {
 
   if (!res.ok) {
     const text = await res.text();
+    console.error("[ghGetJsonFile] response error", {
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
     throw new Error(`GitHub getFile failed (${res.status}): ${text}`);
   }
 
   const data = await res.json();
   // GitHub contents API for file includes base64 content
   if (!data?.content || data?.encoding !== "base64") {
+    console.error("[ghGetJsonFile] unexpected response", {
+      hasContent: !!data?.content,
+      encoding: data?.encoding,
+    });
     throw new Error("Unexpected GitHub file response (no base64 content)");
   }
 

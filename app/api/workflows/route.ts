@@ -11,11 +11,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Invalid team" }, { status: 400 });
   }
 
-  const items = await ghListDir(team);
-  const workflows = items
-    .filter((x) => x.type === "file" && x.name.toLowerCase().endsWith(".json"))
-    .map((x) => ({ name: x.name, path: x.path }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  console.log("[/api/workflows] start", { team });
+  try {
+    const items = await ghListDir(team);
+    const workflows = items
+      .filter((x) => x.type === "file" && x.name.toLowerCase().endsWith(".json"))
+      .map((x) => ({ name: x.name, path: x.path }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
-  return NextResponse.json({ workflows }, { headers: { "Cache-Control": "s-maxage=30" } });
+    console.log("[/api/workflows] success", { workflowCount: workflows.length });
+    return NextResponse.json({ workflows }, { headers: { "Cache-Control": "s-maxage=30" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[/api/workflows] error", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

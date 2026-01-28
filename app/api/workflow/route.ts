@@ -17,13 +17,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Only .json allowed" }, { status: 400 });
   }
 
-  const wf = await ghGetJsonFile(path);
-  const iconMap: Record<string, string> = {};
-  for (const node of wf?.nodes || []) {
-    const type = node?.type || "";
-    if (!type || iconMap[type]) continue;
-    const icon = getIconDataUrlForType(type);
-    if (icon) iconMap[type] = icon;
+  console.log("[/api/workflow] start", { path });
+  try {
+    const wf = await ghGetJsonFile(path);
+    const iconMap: Record<string, string> = {};
+    for (const node of wf?.nodes || []) {
+      const type = node?.type || "";
+      if (!type || iconMap[type]) continue;
+      const icon = getIconDataUrlForType(type);
+      if (icon) iconMap[type] = icon;
+    }
+    console.log("[/api/workflow] success", {
+      nodeCount: Array.isArray(wf?.nodes) ? wf.nodes.length : 0,
+    });
+    return NextResponse.json({ workflow: wf, iconMap }, { headers: { "Cache-Control": "s-maxage=30" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[/api/workflow] error", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-  return NextResponse.json({ workflow: wf, iconMap }, { headers: { "Cache-Control": "s-maxage=30" } });
 }
