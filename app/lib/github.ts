@@ -39,7 +39,8 @@ export async function ghListDir(dirPath: string): Promise<GithubContent[]> {
   const repo = mustEnv("GITHUB_REPO");
   const branch = process.env.GITHUB_BRANCH || "main";
 
-  const url = `${GH_API}/repos/${owner}/${repo}/contents/${encodeURIComponent(dirPath)}?ref=${encodeURIComponent(branch)}`;
+  const encodedPath = encodeGitHubPath(dirPath);
+  const url = buildContentsUrl(owner, repo, encodedPath, branch);
 
   const res = await fetch(url, {
     headers: ghHeaders(),
@@ -61,7 +62,8 @@ export async function ghGetJsonFile(filePath: string): Promise<any> {
   const repo = mustEnv("GITHUB_REPO");
   const branch = process.env.GITHUB_BRANCH || "main";
 
-  const url = `${GH_API}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}?ref=${encodeURIComponent(branch)}`;
+  const encodedPath = encodeGitHubPath(filePath);
+  const url = buildContentsUrl(owner, repo, encodedPath, branch);
 
   const res = await fetch(url, {
     headers: ghHeaders(),
@@ -81,4 +83,20 @@ export async function ghGetJsonFile(filePath: string): Promise<any> {
 
   const jsonStr = Buffer.from(data.content, "base64").toString("utf-8");
   return JSON.parse(jsonStr);
+}
+
+function encodeGitHubPath(input: string): string {
+  const cleanPath = (input || "").replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!cleanPath) return "";
+  return cleanPath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+function buildContentsUrl(owner: string, repo: string, encodedPath: string, branch: string): string {
+  const base = `${GH_API}/repos/${owner}/${repo}/contents/${encodedPath}`;
+  const u = new URL(base);
+  u.searchParams.set("ref", branch);
+  return u.toString();
 }
