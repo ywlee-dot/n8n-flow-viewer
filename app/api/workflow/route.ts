@@ -1,21 +1,29 @@
-// app/api/workflows/route.ts
+// app/api/workflow/route.ts
 import { NextResponse } from "next/server";
-import { ghListDir } from "@/lib/github";
+import { ghGetJsonFile } from "@/lib/github";
+import { getIconDataUrlForType } from "@/lib/n8n-icons";
+
+export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const team = searchParams.get("team") || "";
+  const rawPath = searchParams.get("path") || "";
+  const path = rawPath.replace(/^\/+/, "");
 
-  // 간단한 path 방어
-  if (!team || team.includes("..") || team.includes("\\") || team.startsWith("/")) {
-    return NextResponse.json({ error: "Invalid team" }, { status: 400 });
+  if (!path || path.includes("..") || path.includes("\\") || path.startsWith("/")) {
+    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
+  }
+  if (!path.toLowerCase().endsWith(".json")) {
+    return NextResponse.json({ error: "Only .json allowed" }, { status: 400 });
   }
 
-  const items = await ghListDir(team);
-  const workflows = items
-    .filter((x) => x.type === "file" && x.name.toLowerCase().endsWith(".json"))
-    .map((x) => ({ name: x.name, path: x.path }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  return NextResponse.json({ workflows }, { headers: { "Cache-Control": "s-maxage=30" } });
+  const wf = await ghGetJsonFile(path);
+  const iconMap: Record<string, string> = {};
+  for (const node of wf?.nodes || []) {
+    const type = node?.type || "";
+    if (!type || iconMap[type]) continue;
+    const icon = getIconDataUrlForType(type);
+    if (icon) iconMap[type] = icon;
+  }
+  return NextResponse.json({ workflow: wf, iconMap }, { headers: { "Cache-Control": "s-maxage=30" } });
 }

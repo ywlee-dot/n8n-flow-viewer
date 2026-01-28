@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import ReactFlow, { Background, Controls, MiniMap, Node, Edge } from "reactflow";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import ReactFlow, { applyNodeChanges, Background, Controls, MiniMap, Node, Edge } from "reactflow";
 import "reactflow/dist/style.css";
 import { n8nToReactFlow } from "@/lib/n8n-to-reactflow";
+import N8nNode from "@/components/N8nNode";
+import { MarkerType } from "reactflow";
+
 
 type Team = { name: string; path: string };
 type WorkflowFile = { name: string; path: string };
@@ -13,45 +16,93 @@ export default function FlowViewer() {
   const [team, setTeam] = useState<string>("");
   const [workflows, setWorkflows] = useState<WorkflowFile[]>([]);
   const [selectedPath, setSelectedPath] = useState<string>("");
-
+  const nodeTypes = { n8n: N8nNode };
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<any>(null);
 
   const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+
+  const onNodesChange = useCallback((changes: any[]) => {
+    setRfNodes((nds) => applyNodeChanges(changes, nds));
+  }, []);
+
+  const fetchJson = async (url: string) => {
+    const res = await fetch(url);
+    const text = await res.text();
+    if (!res.ok) {
+      const detail = text ? text.slice(0, 200) : `HTTP ${res.status}`;
+      throw new Error(`Request failed: ${detail}`);
+    }
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON response from ${url}`);
+    }
+  };
 
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/teams");
-      const data = await res.json();
-      setTeams(data.teams || []);
-      if ((data.teams || []).length) setTeam(data.teams[0].name);
+      setError("");
+      try {
+        const data = await fetchJson("/api/teams");
+        setTeams(data.teams || []);
+        if ((data.teams || []).length) setTeam(data.teams[0].name);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(message);
+        setTeams([]);
+        setTeam("");
+        setError(message);
+      }
     })();
   }, []);
 
   useEffect(() => {
     if (!team) return;
     (async () => {
-      const res = await fetch(`/api/workflows?team=${encodeURIComponent(team)}`);
-      const data = await res.json();
-      setWorkflows(data.workflows || []);
-      setSelectedPath("");
-      setRfNodes([]);
-      setRfEdges([]);
-      setSelectedNode(null);
+      setError("");
+      try {
+        const data = await fetchJson(`/api/workflows?team=${encodeURIComponent(team)}`);
+        setWorkflows(data.workflows || []);
+        setSelectedPath("");
+        setRfNodes([]);
+        setRfEdges([]);
+        setSelectedNode(null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(message);
+        setWorkflows([]);
+        setSelectedPath("");
+        setRfNodes([]);
+        setRfEdges([]);
+        setSelectedNode(null);
+        setError(message);
+      }
     })();
   }, [team]);
 
   useEffect(() => {
     if (!selectedPath) return;
     (async () => {
-      const res = await fetch(`/api/workflow?path=${encodeURIComponent(selectedPath)}`);
-      const data = await res.json();
-      const wf = data.workflow;
-      const { nodes, edges } = n8nToReactFlow(wf);
-      setRfNodes(nodes);
-      setRfEdges(edges);
-      setSelectedNode(null);
+      setError("");
+      try {
+        const data = await fetchJson(`/api/workflow?path=${encodeURIComponent(selectedPath)}`);
+        const wf = data.workflow;
+        const { nodes, edges } = n8nToReactFlow(wf, data.iconMap || {});
+        setRfNodes(nodes);
+        setRfEdges(edges);
+        setSelectedNode(null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(message);
+        setRfNodes([]);
+        setRfEdges([]);
+        setSelectedNode(null);
+        setError(message);
+      }
     })();
   }, [selectedPath]);
 
@@ -113,19 +164,35 @@ export default function FlowViewer() {
             </button>
           ))}
         </div>
-      </div>
 
+        {error ? (
+          <div style={{ marginTop: 12, color: "#b00020", fontSize: 12, whiteSpace: "pre-wrap" }}>
+            {error}
+          </div>
+        ) : null}
+      </div>
+      
       {/* Canvas */}
       <div style={{ flex: 1, position: "relative" }}>
+
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          nodesConnectable={false}
           fitView
+          snapToGrid
+          snapGrid={[16, 16]}
+          defaultEdgeOptions={{
+            type: "smoothstep",
+            markerEnd: { type: MarkerType.ArrowClosed },
+          }}
           onNodeClick={(_, node) => setSelectedNode(node.data?.raw ?? node)}
         >
           <MiniMap />
           <Controls />
-          <Background />
+          <Background gap={16} />
         </ReactFlow>
 
         {/* Detail panel */}

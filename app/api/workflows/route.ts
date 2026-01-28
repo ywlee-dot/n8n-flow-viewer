@@ -1,18 +1,21 @@
-// app/api/workflow/route.ts
+// app/api/workflows/route.ts
 import { NextResponse } from "next/server";
-import { ghGetJsonFile } from "@/lib/github";
+import { ghListDir } from "@/lib/github";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const path = searchParams.get("path") || "";
+  const team = searchParams.get("team") || "";
 
-  if (!path || path.includes("..") || path.includes("\\") || path.startsWith("/")) {
-    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
-  }
-  if (!path.toLowerCase().endsWith(".json")) {
-    return NextResponse.json({ error: "Only .json allowed" }, { status: 400 });
+  // 간단한 path 방어
+  if (!team || team.includes("..") || team.includes("\\") || team.startsWith("/")) {
+    return NextResponse.json({ error: "Invalid team" }, { status: 400 });
   }
 
-  const wf = await ghGetJsonFile(path);
-  return NextResponse.json({ workflow: wf }, { headers: { "Cache-Control": "s-maxage=30" } });
+  const items = await ghListDir(team);
+  const workflows = items
+    .filter((x) => x.type === "file" && x.name.toLowerCase().endsWith(".json"))
+    .map((x) => ({ name: x.name, path: x.path }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return NextResponse.json({ workflows }, { headers: { "Cache-Control": "s-maxage=30" } });
 }
