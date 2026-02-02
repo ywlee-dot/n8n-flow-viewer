@@ -10,13 +10,13 @@ import { MarkerType } from "reactflow";
 
 type Team = { name: string; path: string };
 type WorkflowFile = { name: string; path: string };
+const nodeTypes = { n8n: N8nNode };
 
 export default function FlowViewer() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [team, setTeam] = useState<string>("");
   const [workflows, setWorkflows] = useState<WorkflowFile[]>([]);
   const [selectedPath, setSelectedPath] = useState<string>("");
-  const nodeTypes = { n8n: N8nNode };
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<any>(null);
@@ -26,6 +26,15 @@ export default function FlowViewer() {
 
   const onNodesChange = useCallback((changes: any[]) => {
     setRfNodes((nds) => applyNodeChanges(changes, nds));
+  }, []);
+
+  const onNodeSelect = useCallback((node: Node) => {
+    console.log("[onNodeSelect]", { id: node.id, name: node.data?.label });
+    setSelectedNode(node.data?.raw ?? node);
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
   }, []);
 
   const fetchJson = async (url: string) => {
@@ -180,6 +189,7 @@ export default function FlowViewer() {
           edges={rfEdges}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
+          nodesDraggable={false}
           nodesConnectable={false}
           fitView
           snapToGrid
@@ -188,7 +198,8 @@ export default function FlowViewer() {
             type: "smoothstep",
             markerEnd: { type: MarkerType.ArrowClosed },
           }}
-          onNodeClick={(_, node) => setSelectedNode(node.data?.raw ?? node)}
+          onNodeClick={(_, node) => onNodeSelect(node)}
+          onPaneClick={onPaneClick}
         >
           <MiniMap />
           <Controls />

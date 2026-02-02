@@ -29,6 +29,7 @@ export default function N8nNode(props: NodeProps) {
         boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
         overflow: "hidden",
         opacity: disabled ? 0.6 : 1,
+        pointerEvents: "auto",
       }}
     >
       {/* Header */}
